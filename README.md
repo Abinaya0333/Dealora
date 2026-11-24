@@ -1,6 +1,6 @@
-# TrustBridge AI – Full-Stack Implementation Guide
+# Dealore – Full-Stack Implementation Guide
 
-TrustBridge AI is an AI-powered project and agreement management platform for high-trust freelancer-client collaborations. It provides automated scope creep detection (ScopeGuard AI), versioned agreement trails, backend-controlled escrow simulation, official Meta WhatsApp and Instagram message ingestion, and Gemini AI contract intelligence.
+Dealore is an AI-powered project and agreement management platform for high-trust freelancer-client collaborations. It provides automated scope creep detection (ScopeGuard AI), versioned agreement trails, backend-controlled escrow simulation, official Meta WhatsApp and Instagram message ingestion, and Gemini AI contract intelligence.
 
 ---
 
