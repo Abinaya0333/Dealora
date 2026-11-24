@@ -23,6 +23,20 @@ export interface ProjectMilestone {
   releaseDate?: string;
 }
 
+export interface AuditEvent {
+  id: string;
+  projectId: string;
+  eventName: string;
+  userId: string;
+  userName: string;
+  userRole: UserRole;
+  timestamp: string;
+  previousStatus?: string;
+  newStatus?: string;
+  details: string;
+  metadata?: Record<string, any>;
+}
+
 export interface Project {
   id: string;
   title: string;
@@ -37,6 +51,7 @@ export interface Project {
   status: 'active' | 'review' | 'completed' | 'scope_alert';
   currentVersion: number;
   milestones: ProjectMilestone[];
+  auditTrail: AuditEvent[];
 }
 
 export interface Agreement {
@@ -53,18 +68,48 @@ export interface Agreement {
   signedAt?: string;
   revisionLimit: number;
   notes?: string;
+  signers?: {
+    freelancerName: string;
+    freelancerSignedAt?: string;
+    clientName: string;
+    clientSignedAt?: string;
+  };
 }
 
-export type ScopeChangeType = 'added' | 'modified' | 'removed' | 'clarified' | 'unchanged';
+export type ScopeChangeType =
+  | 'added'
+  | 'modified'
+  | 'removed'
+  | 'unchanged'
+  | 'needs_clarification';
+
+export type FreelancerVerificationStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'edited'
+  | 'marked_incorrect'
+  | 'clarification_requested';
 
 export interface ScopeItemAnalysis {
+  id?: string;
   changeType: ScopeChangeType;
   originalRequirement: string;
   newRequirement: string;
   explanation: string;
+  projectImpact: string;
+  confidenceScore: number; // e.g. 94%
+  confidenceLevel: 'High' | 'Medium' | 'Low';
+  originalClauseRef: string;
+  newRequestRef: string;
+  infoRequired?: string;
+  freelancerStatus?: FreelancerVerificationStatus;
+  freelancerNotes?: string;
   estimatedEffort: string;
+  estimatedHours: number;
+  complexity: 'Low' | 'Medium' | 'High' | 'Critical';
   estimatedCost: number;
   estimatedDays: number;
+  estimationReason: string;
 }
 
 export interface ScopeGuardAnalysis {
@@ -73,8 +118,10 @@ export interface ScopeGuardAnalysis {
   items: ScopeItemAnalysis[];
   totalAdditionalCost: number;
   totalAdditionalDays: number;
+  totalAdditionalHours: number;
   revisedBudget: number;
   revisedTimelineDays: number;
+  assumptions: string[];
   recommendations: string[];
   isSampleFallback?: boolean;
   source?: string;
@@ -109,4 +156,15 @@ export interface NotificationItem {
   linkTab?: string;
   linkProjectId?: string;
   linkRequestId?: string;
+}
+
+export interface ProjectHealthMetrics {
+  status: 'Healthy' | 'Needs Attention' | 'At Risk';
+  score: number; // 0 - 100
+  scopeStabilityPct: number;
+  pendingApprovalsCount: number;
+  milestoneCompletionPct: number;
+  daysRemaining: number;
+  outstandingRequestsCount: number;
+  reasons: string[];
 }

@@ -12,6 +12,8 @@ import {
   History,
   FileSignature,
   Users,
+  Activity,
+  FileDown,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Project } from '../../types';
@@ -25,6 +27,9 @@ export const ProjectManagement: React.FC = () => {
     selectedProjectId,
     setSelectedProjectId,
     setActiveTab,
+    agreements,
+    openAgreementExport,
+    getProjectHealth,
   } = useApp();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -117,6 +122,21 @@ export const ProjectManagement: React.FC = () => {
                 <div className="flex items-start justify-between gap-2 mb-3">
                   <div className="space-y-1">
                     <div className="flex items-center space-x-2">
+                      {(() => {
+                        const health = getProjectHealth(proj.id);
+                        const color =
+                          health.status === 'Healthy'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : health.status === 'Needs Attention'
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                            : 'bg-rose-50 text-rose-700 border-rose-200';
+                        return (
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border flex items-center space-x-1 ${color}`}>
+                            <Activity className="w-3 h-3" />
+                            <span>Health: {health.score}/100</span>
+                          </span>
+                        );
+                      })()}
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-50 text-blue-700 border border-blue-100">
                         Version {proj.currentVersion}.0
                       </span>
@@ -132,9 +152,9 @@ export const ProjectManagement: React.FC = () => {
 
                   <button
                     onClick={() => setSelectedProjectId(proj.id)}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                       isSelected
-                        ? 'bg-blue-600 text-white'
+                        ? 'bg-blue-600 text-white shadow-sm'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
@@ -185,28 +205,54 @@ export const ProjectManagement: React.FC = () => {
               </div>
 
               {/* Action Buttons */}
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-2">
-                <button
-                  onClick={() => {
-                    setSelectedProjectId(proj.id);
-                    setActiveTab('agreements');
-                  }}
-                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors"
-                >
-                  <FileSignature className="w-3.5 h-3.5" />
-                  <span>Agreement</span>
-                </button>
+              <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center space-x-1.5">
+                  <button
+                    onClick={() => {
+                      setSelectedProjectId(proj.id);
+                      setActiveTab('agreements');
+                    }}
+                    className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    <FileSignature className="w-3.5 h-3.5" />
+                    <span>Agreement</span>
+                  </button>
 
-                <div className="flex items-center space-x-2">
                   <button
                     onClick={() => {
                       setSelectedProjectId(proj.id);
                       setActiveTab('version-history');
                     }}
-                    className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors"
+                    className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
                   >
                     <History className="w-3.5 h-3.5" />
                     <span>Versions</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setSelectedProjectId(proj.id);
+                      setActiveTab('audit-trail');
+                    }}
+                    className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    <Activity className="w-3.5 h-3.5" />
+                    <span>Audit</span>
+                  </button>
+                </div>
+
+                <div className="flex items-center space-x-1.5">
+                  <button
+                    onClick={() => {
+                      const agr = agreements.find(
+                        (a) => a.projectId === proj.id && a.version === proj.currentVersion
+                      ) || agreements.find((a) => a.projectId === proj.id);
+                      if (agr) openAgreementExport(agr.id);
+                    }}
+                    className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    <FileDown className="w-3.5 h-3.5 text-blue-600" />
+                    <span>PDF</span>
                   </button>
 
                   <button
@@ -217,7 +263,7 @@ export const ProjectManagement: React.FC = () => {
                     className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-sm transition-colors cursor-pointer"
                   >
                     <ShieldAlert className="w-3.5 h-3.5" />
-                    <span>Run ScopeGuard</span>
+                    <span>ScopeGuard</span>
                   </button>
                 </div>
               </div>

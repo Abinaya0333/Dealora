@@ -337,7 +337,7 @@ export const MilestoneTracker: React.FC = () => {
                 </div>
               </div>
               <p className="text-[10px] text-slate-400 text-center">
-                TrustBridge Simulated Escrow • Demo Receipt Proof
+                Dealora Simulated Escrow • Demo Receipt Proof
               </p>
             </div>
 

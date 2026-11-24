@@ -17,7 +17,7 @@ import {
 import { useApp } from '../../context/AppContext';
 
 export const VersionHistoryView: React.FC = () => {
-  const { projects, agreements, selectedProjectId } = useApp();
+  const { projects, agreements, selectedProjectId, openAgreementExport, setActiveTab } = useApp();
 
   const currentProject =
     projects.find((p) => p.id === selectedProjectId) || projects[0];
@@ -50,10 +50,23 @@ export const VersionHistoryView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center space-x-2">
-          <span className="px-3 py-1.5 rounded-xl bg-slate-100 text-xs font-bold text-slate-700 border border-slate-200">
-            Total Versions: {projectAgreements.length}
-          </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => openAgreementExport()}
+            className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Export Agreement PDF</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('audit-trail')}
+            className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+          >
+            <History className="w-3.5 h-3.5" />
+            <span>View Audit Trail</span>
+          </button>
+
           {v2 ? (
             <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-xs font-bold text-emerald-700 border border-emerald-200 flex items-center space-x-1.5">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />

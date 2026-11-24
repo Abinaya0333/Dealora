@@ -36,8 +36,8 @@ export const LandingPage: React.FC = () => {
       a: 'ScopeGuard AI uses Gemini 3.8 Flash to semantically compare original contract specifications with subsequent client change requests. It identifies newly introduced features, quantifies the added engineering effort, and generates an objective cost and timeline proposal addendum before any unbilled work commences.',
     },
     {
-      q: 'Does TrustBridge overwrite original agreements when changes happen?',
-      a: 'Never. TrustBridge implements immutable version history. When a client approves a ScopeGuard proposal, Agreement Version 2.0 is created with updated fees and milestones, while Version 1.0 remains permanently preserved in the cryptographic audit ledger.',
+      q: 'Does Dealora overwrite original agreements when changes happen?',
+      a: 'Never. Dealora implements immutable version history. When a client approves a ScopeGuard proposal, Agreement Version 2.0 is created with updated fees and milestones, while Version 1.0 remains permanently preserved in the cryptographic audit ledger.',
     },
     {
       q: 'What is Simulated Milestone Escrow in the demo?',
@@ -74,7 +74,7 @@ export const LandingPage: React.FC = () => {
           </h1>
 
           <p className="mt-6 text-lg sm:text-xl text-slate-300 max-w-3xl mx-auto font-normal leading-relaxed">
-            TrustBridge AI eliminates scope creep, unclear agreements, and payment disputes with
+            Dealora eliminates scope creep, unclear agreements, and payment disputes with
             automated <strong>ScopeGuard™ AI analysis</strong>, immutable agreement versioning, and
             transparent milestone escrow.
           </p>
@@ -167,13 +167,13 @@ export const LandingPage: React.FC = () => {
               </ul>
             </div>
 
-            {/* The TrustBridge AI Solution */}
+            {/* The Dealora Solution */}
             <div className="rounded-2xl bg-gradient-to-br from-blue-950/60 to-slate-950 border border-blue-500/40 p-8 space-y-5 shadow-xl shadow-blue-500/10">
               <div className="flex items-center space-x-3 text-blue-400">
                 <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
                   <Shield className="w-5 h-5 text-cyan-300" />
                 </div>
-                <h4 className="text-xl font-bold">The TrustBridge AI Guarantee</h4>
+                <h4 className="text-xl font-bold">The Dealora Guarantee</h4>
               </div>
               <ul className="space-y-3.5 text-sm text-slate-200">
                 <li className="flex items-start space-x-3">
@@ -214,7 +214,7 @@ export const LandingPage: React.FC = () => {
             ScopeGuard AI in Action
           </h2>
           <p className="mt-3 text-sm text-slate-400">
-            See how TrustBridge turns client change requests into structured, paid proposals.
+            See how Dealora turns client change requests into structured, paid proposals.
           </p>
         </div>
 
@@ -350,7 +350,7 @@ export const LandingPage: React.FC = () => {
       <section className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-xs font-bold uppercase tracking-wider text-blue-400 mb-2">
-            The TrustBridge Protocol
+            The Dealora Protocol
           </h2>
           <h3 className="text-3xl sm:text-4xl font-extrabold">How It Works in 4 Steps</h3>
         </div>
@@ -517,7 +517,7 @@ export const LandingPage: React.FC = () => {
             <div className="w-6 h-6 rounded-lg bg-blue-600 flex items-center justify-center">
               <Shield className="w-3.5 h-3.5 text-white" />
             </div>
-            <span className="font-bold text-white">TrustBridge AI</span>
+            <span className="font-bold text-white">Dealora</span>
             <span>• Protect Your Work. Build Trust. Manage Every Change.</span>
           </div>
 

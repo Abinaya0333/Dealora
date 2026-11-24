@@ -4,7 +4,7 @@ export const DEMO_USERS: User[] = [
   {
     id: 'freelancer-a',
     name: 'Alex Rivera',
-    email: 'alex.rivera@trustbridge.demo',
+    email: 'alex.rivera@dealora.demo',
     role: 'freelancer',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
     title: 'Senior Web Developer',
@@ -13,7 +13,7 @@ export const DEMO_USERS: User[] = [
   {
     id: 'freelancer-b',
     name: 'Elena Rostova',
-    email: 'elena.rostova@trustbridge.demo',
+    email: 'elena.rostova@dealora.demo',
     role: 'freelancer',
     avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
     title: 'Lead UI/UX Designer',
@@ -39,12 +39,12 @@ export const DEMO_USERS: User[] = [
   },
   {
     id: 'admin-1',
-    name: 'TrustBridge Admin',
-    email: 'admin@trustbridge.ai',
+    name: 'Dealora Admin',
+    email: 'admin@dealora.ai',
     role: 'admin',
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
     title: 'Platform Compliance Officer',
-    company: 'TrustBridge Global',
+    company: 'Dealora Global',
   },
 ];
 
@@ -89,6 +89,56 @@ export const INITIAL_PROJECTS: Project[] = [
         simulatedTxId: 'TX-SIM-920144-TB',
       },
     ],
+    auditTrail: [
+      {
+        id: 'aud-1-1',
+        projectId: 'proj-1',
+        eventName: 'Project Workspace Initialized',
+        userId: 'freelancer-a',
+        userName: 'Alex Rivera',
+        userRole: 'freelancer',
+        timestamp: '2026-11-01T09:00:00Z',
+        previousStatus: 'None',
+        newStatus: 'active',
+        details: 'Initial project workspace created with $200 baseline budget and 15-day timeline.',
+      },
+      {
+        id: 'aud-1-2',
+        projectId: 'proj-1',
+        eventName: 'Agreement v1.0 Generated & Dispatched',
+        userId: 'freelancer-a',
+        userName: 'Alex Rivera',
+        userRole: 'freelancer',
+        timestamp: '2026-11-01T09:30:00Z',
+        previousStatus: 'draft',
+        newStatus: 'sent_to_client',
+        details: 'Generated Services Agreement v1.0 with ScopeGuard clause and 2 revision limit.',
+      },
+      {
+        id: 'aud-1-3',
+        projectId: 'proj-1',
+        eventName: 'Agreement v1.0 Signed & Sealed',
+        userId: 'client-a',
+        userName: 'Marcus Vance',
+        userRole: 'client',
+        timestamp: '2026-11-01T11:30:00Z',
+        previousStatus: 'sent_to_client',
+        newStatus: 'accepted',
+        details: 'Marcus Vance signed Agreement v1.0. Baseline milestone escrow initiated.',
+      },
+      {
+        id: 'aud-1-4',
+        projectId: 'proj-1',
+        eventName: 'Milestone 1 Payment Authorized ($80)',
+        userId: 'client-a',
+        userName: 'Marcus Vance',
+        userRole: 'client',
+        timestamp: '2026-11-04T16:00:00Z',
+        previousStatus: 'escrow_funded',
+        newStatus: 'released',
+        details: 'Wireframe deliverables approved. Simulated transaction TX-SIM-849102-TB released to Alex Rivera.',
+      },
+    ],
   },
   {
     id: 'proj-2',
@@ -130,6 +180,32 @@ export const INITIAL_PROJECTS: Project[] = [
         simulatedTxId: 'TX-SIM-481920-TB',
       },
     ],
+    auditTrail: [
+      {
+        id: 'aud-2-1',
+        projectId: 'proj-2',
+        eventName: 'Project Workspace Initialized',
+        userId: 'freelancer-b',
+        userName: 'Elena Rostova',
+        userRole: 'freelancer',
+        timestamp: '2026-10-25T10:00:00Z',
+        previousStatus: 'None',
+        newStatus: 'active',
+        details: 'Created brand kit project for Apex Commerce ($1,200).',
+      },
+      {
+        id: 'aud-2-2',
+        projectId: 'proj-2',
+        eventName: 'Milestone 1 Payment Released ($500)',
+        userId: 'client-b',
+        userName: 'Sarah Jenkins',
+        userRole: 'client',
+        timestamp: '2026-11-03T14:20:00Z',
+        previousStatus: 'escrow_funded',
+        newStatus: 'released',
+        details: 'Approved brand tokens deliverable. TX-SIM-312988-TB cleared.',
+      },
+    ],
   },
 ];
 
@@ -154,7 +230,7 @@ Provider agrees to deliver the following:
 2. BUDGET & FINANCIAL TERMS
 Total Fixed Fee: $200 USD
 Timeline: 15 business days
-Payment Method: TrustBridge Simulated Milestone Escrow
+Payment Method: Dealora Simulated Milestone Escrow
 
 3. REVISION POLICY
 Includes up to 2 rounds of standard visual and copy adjustments. Additional page templates or architectural modifications are not included.
@@ -205,7 +281,7 @@ export const INITIAL_NOTIFICATIONS: NotificationItem[] = [
     id: 'notif-3',
     recipientId: 'freelancer-a',
     type: 'info',
-    title: 'TrustBridge ScopeGuard AI Ready',
+    title: 'Dealora ScopeGuard AI Ready',
     message: 'ScopeGuard AI is active. Run a scope scan anytime your client requests additional features.',
     timestamp: '1 day ago',
     read: false,

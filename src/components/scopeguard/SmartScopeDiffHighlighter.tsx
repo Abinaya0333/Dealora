@@ -1,0 +1,554 @@
+import React, { useState } from 'react';
+import {
+  Sparkles,
+  ShieldCheck,
+  CheckCircle2,
+  AlertTriangle,
+  HelpCircle,
+  XCircle,
+  FileText,
+  Clock,
+  DollarSign,
+  Edit3,
+  MessageSquare,
+  ThumbsUp,
+  ThumbsDown,
+  Info,
+  ChevronRight,
+  Filter,
+} from 'lucide-react';
+import { ScopeGuardAnalysis, ScopeItemAnalysis, ScopeChangeType, FreelancerVerificationStatus } from '../../types';
+import { useApp } from '../../context/AppContext';
+
+interface Props {
+  analysis: ScopeGuardAnalysis;
+  requestId?: string;
+  onItemUpdated?: (index: number, updatedItem: ScopeItemAnalysis) => void;
+  isEditable?: boolean;
+}
+
+export const SmartScopeDiffHighlighter: React.FC<Props> = ({
+  analysis,
+  requestId,
+  onItemUpdated,
+  isEditable = true,
+}) => {
+  const { updateScopeItemFinding } = useApp();
+
+  const [activeFilter, setActiveFilter] = useState<'all' | ScopeChangeType>('all');
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editCost, setEditCost] = useState<number>(0);
+  const [editDays, setEditDays] = useState<number>(0);
+  const [editHours, setEditHours] = useState<number>(0);
+  const [editType, setEditType] = useState<ScopeChangeType>('added');
+  const [editNotes, setEditNotes] = useState<string>('');
+
+  const items = analysis.items || [];
+
+  // Filter items
+  const filteredItems = items.filter((it) => {
+    if (activeFilter === 'all') return true;
+    return it.changeType === activeFilter;
+  });
+
+  const getCategoryColor = (type: ScopeChangeType) => {
+    switch (type) {
+      case 'added':
+        return {
+          bg: 'bg-emerald-500/10',
+          text: 'text-emerald-700',
+          border: 'border-emerald-500/30',
+          badgeBg: 'bg-emerald-600 text-white',
+          label: 'Added Requirement',
+        };
+      case 'modified':
+        return {
+          bg: 'bg-amber-500/10',
+          text: 'text-amber-700',
+          border: 'border-amber-500/30',
+          badgeBg: 'bg-amber-500 text-white',
+          label: 'Modified Requirement',
+        };
+      case 'removed':
+        return {
+          bg: 'bg-rose-500/10',
+          text: 'text-rose-700',
+          border: 'border-rose-500/30',
+          badgeBg: 'bg-rose-600 text-white',
+          label: 'Removed Requirement',
+        };
+      case 'unchanged':
+        return {
+          bg: 'bg-slate-500/10',
+          text: 'text-slate-700',
+          border: 'border-slate-500/30',
+          badgeBg: 'bg-slate-600 text-white',
+          label: 'Unchanged Baseline',
+        };
+      case 'needs_clarification':
+        return {
+          bg: 'bg-purple-500/10',
+          text: 'text-purple-700',
+          border: 'border-purple-500/30',
+          badgeBg: 'bg-purple-600 text-white',
+          label: 'Needs Clarification',
+        };
+      default:
+        return {
+          bg: 'bg-slate-100',
+          text: 'text-slate-700',
+          border: 'border-slate-300',
+          badgeBg: 'bg-slate-600 text-white',
+          label: 'Item',
+        };
+    }
+  };
+
+  const handleStartEdit = (index: number, item: ScopeItemAnalysis) => {
+    setEditingIndex(index);
+    setEditCost(item.estimatedCost);
+    setEditDays(item.estimatedDays);
+    setEditHours(item.estimatedHours || 0);
+    setEditType(item.changeType);
+    setEditNotes(item.freelancerNotes || '');
+  };
+
+  const handleSaveEdit = (index: number) => {
+    const originalItem = items[index];
+    const updated: ScopeItemAnalysis = {
+      ...originalItem,
+      changeType: editType,
+      estimatedCost: editCost,
+      estimatedDays: editDays,
+      estimatedHours: editHours,
+      estimatedEffort: `${editHours} hours`,
+      freelancerStatus: 'edited',
+      freelancerNotes: editNotes,
+    };
+
+    if (requestId) {
+      updateScopeItemFinding(requestId, index, updated);
+    }
+    if (onItemUpdated) {
+      onItemUpdated(index, updated);
+    }
+    setEditingIndex(null);
+  };
+
+  const handleVerifyStatus = (index: number, status: FreelancerVerificationStatus) => {
+    const originalItem = items[index];
+    const updated: ScopeItemAnalysis = {
+      ...originalItem,
+      freelancerStatus: status,
+    };
+
+    if (requestId) {
+      updateScopeItemFinding(requestId, index, { freelancerStatus: status });
+    }
+    if (onItemUpdated) {
+      onItemUpdated(index, updated);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Disclaimer distinguishing AI findings from verified facts (FEATURE 2) */}
+      <div className="bg-slate-900 border border-blue-500/30 rounded-2xl p-4 text-xs text-slate-300 flex items-start space-x-3 shadow-sm">
+        <Sparkles className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+        <div className="leading-relaxed">
+          <strong className="text-white font-bold">ScopeGuard AI Transparency Notice:</strong> AI
+          confidence scores and diff classifications represent automated semantic comparisons
+          generated by Gemini 3.8 Flash. They are not guaranteed quotes or legal definitions until
+          reviewed, customized, and accepted by both parties.
+        </div>
+      </div>
+
+      {/* Category Filter Pills (FEATURE 1) */}
+      <div className="flex flex-wrap items-center gap-2 pb-2">
+        <div className="flex items-center space-x-1.5 text-xs font-bold text-slate-500 mr-2">
+          <Filter className="w-3.5 h-3.5" />
+          <span>Filter Differences:</span>
+        </div>
+
+        <button
+          onClick={() => setActiveFilter('all')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeFilter === 'all'
+              ? 'bg-slate-900 text-white shadow-sm'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          All Items ({items.length})
+        </button>
+
+        <button
+          onClick={() => setActiveFilter('added')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
+            activeFilter === 'added'
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          <span>Added ({items.filter((i) => i.changeType === 'added').length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveFilter('modified')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
+            activeFilter === 'modified'
+              ? 'bg-amber-600 text-white shadow-sm'
+              : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-amber-500" />
+          <span>Modified ({items.filter((i) => i.changeType === 'modified').length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveFilter('removed')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
+            activeFilter === 'removed'
+              ? 'bg-rose-600 text-white shadow-sm'
+              : 'bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100'
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-rose-500" />
+          <span>Removed ({items.filter((i) => i.changeType === 'removed').length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveFilter('unchanged')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
+            activeFilter === 'unchanged'
+              ? 'bg-slate-700 text-white shadow-sm'
+              : 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200'
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-slate-500" />
+          <span>Unchanged ({items.filter((i) => i.changeType === 'unchanged').length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveFilter('needs_clarification')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
+            activeFilter === 'needs_clarification'
+              ? 'bg-purple-600 text-white shadow-sm'
+              : 'bg-purple-50 text-purple-800 border border-purple-200 hover:bg-purple-100'
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-purple-500" />
+          <span>Needs Clarification ({items.filter((i) => i.changeType === 'needs_clarification').length})</span>
+        </button>
+      </div>
+
+      {/* Difference Cards Grid (Side-by-Side Highlighted Comparison) */}
+      <div className="space-y-4">
+        {filteredItems.map((item, index) => {
+          const color = getCategoryColor(item.changeType);
+          const isEditing = editingIndex === index;
+          const status = item.freelancerStatus || 'pending';
+
+          return (
+            <div
+              key={index}
+              className={`rounded-2xl border-2 transition-all p-5 bg-white shadow-sm ${color.border} ${
+                status === 'confirmed' ? 'ring-1 ring-emerald-500/40' : ''
+              }`}
+            >
+              {/* Header: Change Type Badge + AI Confidence + Freelancer Verification status */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-3 mb-4">
+                <div className="flex items-center space-x-2.5">
+                  <span className={`px-2.5 py-1 rounded-lg text-xs font-extrabold uppercase ${color.badgeBg}`}>
+                    {color.label}
+                  </span>
+
+                  {/* AI Confidence Gauge (FEATURE 2) */}
+                  <div className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-900 font-semibold">
+                    <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                    <span>AI Confidence: {item.confidenceScore}%</span>
+                    <span className="text-[10px] text-blue-600 uppercase font-bold">({item.confidenceLevel})</span>
+                  </div>
+                </div>
+
+                {/* Freelancer Review Status & Actions (FEATURE 2) */}
+                <div className="flex items-center space-x-2">
+                  <span className="text-[11px] text-slate-400 font-medium">Verification:</span>
+                  {status === 'confirmed' && (
+                    <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center space-x-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      <span>Confirmed by Freelancer</span>
+                    </span>
+                  )}
+                  {status === 'edited' && (
+                    <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-[10px] font-bold flex items-center space-x-1">
+                      <Edit3 className="w-3 h-3 text-blue-600" />
+                      <span>Edited by Freelancer</span>
+                    </span>
+                  )}
+                  {status === 'marked_incorrect' && (
+                    <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-800 text-[10px] font-bold flex items-center space-x-1">
+                      <XCircle className="w-3 h-3 text-rose-600" />
+                      <span>Marked Incorrect</span>
+                    </span>
+                  )}
+                  {status === 'clarification_requested' && (
+                    <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-[10px] font-bold flex items-center space-x-1">
+                      <HelpCircle className="w-3 h-3 text-purple-600" />
+                      <span>Clarification Requested</span>
+                    </span>
+                  )}
+                  {status === 'pending' && (
+                    <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold">
+                      Awaiting Review
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Side-by-Side Comparison Panels */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                {/* Original Requirement */}
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="font-bold text-slate-500 uppercase tracking-wider">
+                      Original Contract Baseline
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400">
+                      Ref: {item.originalClauseRef}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-800 font-medium leading-relaxed">
+                    {item.originalRequirement}
+                  </p>
+                </div>
+
+                {/* New Client Requirement */}
+                <div className={`p-4 rounded-xl border space-y-1.5 ${color.bg} ${color.border}`}>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className={`font-bold uppercase tracking-wider ${color.text}`}>
+                      New Client Requirement
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-500">
+                      Ref: {item.newRequestRef}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-900 font-bold leading-relaxed">
+                    {item.newRequirement}
+                  </p>
+                </div>
+              </div>
+
+              {/* Explanation & Project Impact (FEATURE 1) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4 text-xs">
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                  <span className="font-bold text-slate-700 block mb-1">
+                    Why Classified as {item.changeType.toUpperCase()}:
+                  </span>
+                  <p className="text-slate-600 leading-relaxed text-[11px]">{item.explanation}</p>
+                </div>
+
+                <div className="p-3 rounded-xl bg-blue-50/40 border border-blue-100">
+                  <span className="font-bold text-blue-900 block mb-1">Potential Project Impact:</span>
+                  <p className="text-blue-800 leading-relaxed text-[11px]">{item.projectImpact}</p>
+                </div>
+              </div>
+
+              {/* Information Required if uncertain (FEATURE 2) */}
+              {item.infoRequired && (
+                <div className="mb-4 p-3 rounded-xl bg-purple-50 border border-purple-200 text-xs text-purple-900 flex items-start space-x-2">
+                  <HelpCircle className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="font-bold">Clarification Needed:</strong> {item.infoRequired}
+                  </div>
+                </div>
+              )}
+
+              {/* Advanced Effort Estimator Breakdown (FEATURE 3) */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 mb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-slate-200/60 gap-2 mb-3">
+                  <div className="flex items-center space-x-2 text-xs font-bold text-slate-800">
+                    <Clock className="w-3.5 h-3.5 text-blue-600" />
+                    <span>AI Effort & Cost Estimation</span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-800">
+                      Complexity: {item.complexity}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-500">
+                    Hours: <strong>{item.estimatedHours || 0} hrs</strong> • Rate proportional to contract baseline
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3 text-center mb-2">
+                  <div className="bg-white p-2.5 rounded-lg border border-slate-200">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold">Estimated Effort</span>
+                    <div className="text-sm font-black text-slate-900 mt-0.5">{item.estimatedEffort}</div>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-slate-200">
+                    <span className="text-[10px] text-emerald-600 uppercase font-bold">Additional Fee</span>
+                    <div className="text-sm font-black text-emerald-600 mt-0.5">+${item.estimatedCost}</div>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-slate-200">
+                    <span className="text-[10px] text-indigo-600 uppercase font-bold">Added Timeline</span>
+                    <div className="text-sm font-black text-indigo-900 mt-0.5">+{item.estimatedDays} days</div>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-slate-500 italic">
+                  <strong>Assumptions:</strong> {item.estimationReason}
+                </p>
+              </div>
+
+              {/* Freelancer Action Toolbar (Confirm, Edit, Mark Incorrect, Clarify) (FEATURE 2) */}
+              {isEditable && (
+                <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleVerifyStatus(index, 'confirmed')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 ${
+                        status === 'confirmed'
+                          ? 'bg-emerald-600 text-white shadow-sm'
+                          : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
+                      }`}
+                    >
+                      <ThumbsUp className="w-3.5 h-3.5" />
+                      <span>Confirm Finding</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleStartEdit(index, item)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 ${
+                        isEditing
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+                      }`}
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>Edit Classification / Cost</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleVerifyStatus(index, 'marked_incorrect')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 ${
+                        status === 'marked_incorrect'
+                          ? 'bg-rose-600 text-white'
+                          : 'bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200'
+                      }`}
+                    >
+                      <ThumbsDown className="w-3.5 h-3.5" />
+                      <span>Mark Incorrect</span>
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={() => handleVerifyStatus(index, 'clarification_requested')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 ${
+                      status === 'clarification_requested'
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-purple-50 text-purple-800 hover:bg-purple-100 border border-purple-200'
+                    }`}
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span>Ask Client to Clarify</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Inline Edit Drawer (FEATURE 2 & 3) */}
+              {isEditing && (
+                <div className="mt-4 p-4 rounded-xl bg-blue-50/70 border border-blue-200 animate-in fade-in space-y-3">
+                  <h5 className="text-xs font-bold text-blue-900 uppercase tracking-wider">
+                    Edit AI Classification & Estimation
+                  </h5>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Category
+                      </label>
+                      <select
+                        value={editType}
+                        onChange={(e) => setEditType(e.target.value as ScopeChangeType)}
+                        className="w-full bg-white border border-slate-300 rounded-lg p-2 font-bold"
+                      >
+                        <option value="added">Added</option>
+                        <option value="modified">Modified</option>
+                        <option value="removed">Removed</option>
+                        <option value="unchanged">Unchanged</option>
+                        <option value="needs_clarification">Needs Clarification</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Dev Hours
+                      </label>
+                      <input
+                        type="number"
+                        value={editHours}
+                        onChange={(e) => setEditHours(Number(e.target.value))}
+                        className="w-full bg-white border border-slate-300 rounded-lg p-2 font-bold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Additional Cost ($)
+                      </label>
+                      <input
+                        type="number"
+                        value={editCost}
+                        onChange={(e) => setEditCost(Number(e.target.value))}
+                        className="w-full bg-white border border-slate-300 rounded-lg p-2 font-bold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Additional Days
+                      </label>
+                      <input
+                        type="number"
+                        value={editDays}
+                        onChange={(e) => setEditDays(Number(e.target.value))}
+                        className="w-full bg-white border border-slate-300 rounded-lg p-2 font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Freelancer Rationale / Override Reason
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Adjusted based on custom Stripe integration complexity"
+                      value={editNotes}
+                      onChange={(e) => setEditNotes(e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs"
+                    />
+                  </div>
+
+                  <div className="flex justify-end space-x-2 pt-2">
+                    <button
+                      onClick={() => setEditingIndex(null)}
+                      className="px-3 py-1.5 rounded-lg bg-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-300"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleSaveEdit(index)}
+                      className="px-4 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-500 shadow-sm"
+                    >
+                      Save Override
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};

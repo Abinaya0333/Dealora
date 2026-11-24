@@ -99,7 +99,7 @@ export const AgreementGenerator: React.FC = () => {
         <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
         <p className="leading-relaxed">
           <strong className="font-bold">Human Review Required:</strong> Automated agreement drafts
-          generated on TrustBridge AI incorporate protective ScopeGuard™ clauses, revision
+          generated on Dealora incorporate protective ScopeGuard™ clauses, revision
           limits, and milestone payment schedules. These templates are illustrative examples and
           should be customized to your jurisdiction and specific engagement scope.
         </p>

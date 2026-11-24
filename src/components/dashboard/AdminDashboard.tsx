@@ -60,7 +60,7 @@ export const AdminDashboard: React.FC = () => {
             <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-purple-500/20 text-purple-300 border border-purple-500/30">
               Platform Governance
             </span>
-            <span className="text-xs text-slate-400">TrustBridge AI Global Network</span>
+            <span className="text-xs text-slate-400">Dealora Global Network</span>
           </div>
           <h1 className="text-2xl font-extrabold mt-1">Platform Admin & Trust Operations</h1>
           <p className="text-xs text-slate-400 mt-0.5">

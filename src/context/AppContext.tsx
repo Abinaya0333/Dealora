@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import confetti from 'canvas-confetti';
 import {
   User,
@@ -8,6 +8,9 @@ import {
   NotificationItem,
   ScopeGuardAnalysis,
   ProjectMilestone,
+  AuditEvent,
+  ProjectHealthMetrics,
+  ScopeItemAnalysis,
 } from '../types';
 import {
   DEMO_USERS,
@@ -24,6 +27,7 @@ interface AppContextType {
   switchUserById: (userId: string) => void;
   users: User[];
   projects: Project[];
+  currentUserProjects: Project[];
   agreements: Agreement[];
   changeRequests: ScopeChangeRequest[];
   notifications: NotificationItem[];
@@ -31,15 +35,24 @@ interface AppContextType {
   setActiveTab: (tab: string) => void;
   selectedProjectId: string;
   setSelectedProjectId: (id: string) => void;
-  
+
   // Project Actions
   createProject: (data: Partial<Project>) => Project;
   updateProject: (id: string, updates: Partial<Project>) => void;
-  
+  getProjectHealth: (projectId: string) => ProjectHealthMetrics;
+  addAuditEvent: (
+    projectId: string,
+    eventName: string,
+    details: string,
+    previousStatus?: string,
+    newStatus?: string,
+    metadata?: Record<string, any>
+  ) => void;
+
   // Agreement Actions
   createAgreementDraft: (data: Partial<Agreement>) => Promise<Agreement>;
   sendAgreementToClient: (agreementId: string) => void;
-  
+
   // ScopeGuard & Proposal Actions
   submitChangeRequestByClient: (projectId: string, requestedText: string) => ScopeChangeRequest;
   runScopeGuardAnalysis: (
@@ -49,6 +62,11 @@ interface AppContextType {
     originalDays: number,
     newRequirements: string
   ) => Promise<ScopeGuardAnalysis>;
+  updateScopeItemFinding: (
+    requestId: string,
+    itemIndex: number,
+    updates: Partial<ScopeItemAnalysis>
+  ) => void;
   sendRevisedProposal: (
     requestId: string,
     cost: number,
@@ -58,15 +76,23 @@ interface AppContextType {
   ) => void;
   acceptRevisedProposal: (requestId: string) => void;
   rejectRevisedProposal: (requestId: string, reason?: string) => void;
-  
+
   // Milestones Actions
   updateMilestoneStatus: (projectId: string, milestoneId: string, status: ProjectMilestone['status']) => void | Promise<void>;
   addProjectMilestone: (projectId: string, milestone: Omit<ProjectMilestone, 'id' | 'projectId' | 'simulatedTxId'>) => void;
-  
+
   // Notification Actions
   markNotificationRead: (id: string) => void;
   clearAllNotifications: () => void;
-  
+
+  // Modals & Exports
+  isJudgeModalOpen: boolean;
+  setIsJudgeModalOpen: (open: boolean) => void;
+  isExportModalOpen: boolean;
+  setIsExportModalOpen: (open: boolean) => void;
+  exportTargetAgreementId: string | null;
+  openAgreementExport: (agreementId?: string) => void;
+
   // Demo State & Walkthrough
   resetDemoData: () => void;
   walkthroughStep: number;
@@ -74,22 +100,23 @@ interface AppContextType {
   isWalkthroughOpen: boolean;
   setIsWalkthroughOpen: (open: boolean) => void;
   executeWalkthroughAction: (step: number) => Promise<void>;
+  launchInteractiveJudgeDemo: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  CURRENT_USER_ID: 'trustbridge_user_id',
-  PROJECTS: 'trustbridge_projects_v2',
-  AGREEMENTS: 'trustbridge_agreements_v2',
-  CHANGE_REQUESTS: 'trustbridge_change_requests_v2',
-  NOTIFICATIONS: 'trustbridge_notifications_v2',
-  WALKTHROUGH_STEP: 'trustbridge_step_v2',
+  CURRENT_USER_ID: 'dealora_user_id_v1',
+  PROJECTS: 'dealora_projects_v1',
+  AGREEMENTS: 'dealora_agreements_v1',
+  CHANGE_REQUESTS: 'dealora_change_requests_v1',
+  NOTIFICATIONS: 'dealora_notifications_v1',
+  WALKTHROUGH_STEP: 'dealora_step_v1',
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const users = DEMO_USERS;
-  
+
   // Local storage state initialization
   const [currentUser, setCurrentUser] = useState<User>(() => {
     const savedId = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID);
@@ -140,6 +167,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? parseInt(saved, 10) : 0;
   });
   const [isWalkthroughOpen, setIsWalkthroughOpen] = useState<boolean>(true);
+  const [isJudgeModalOpen, setIsJudgeModalOpen] = useState<boolean>(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
+  const [exportTargetAgreementId, setExportTargetAgreementId] = useState<string | null>(null);
 
   // Sync to localStorage
   useEffect(() => {
@@ -166,11 +196,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem(STORAGE_KEYS.WALKTHROUGH_STEP, walkthroughStep.toString());
   }, [walkthroughStep]);
 
+  // Strict Role-Based Project Filtering (FEATURE 10: Security & Permissions)
+  const currentUserProjects = useMemo(() => {
+    if (currentUser.role === 'admin') {
+      return projects;
+    }
+    if (currentUser.role === 'freelancer') {
+      return projects.filter((p) => p.freelancerId === currentUser.id);
+    }
+    if (currentUser.role === 'client') {
+      return projects.filter((p) => p.clientId === currentUser.id);
+    }
+    return [];
+  }, [projects, currentUser]);
+
+  // Ensure selectedProjectId is valid for the current user's scope
+  useEffect(() => {
+    if (currentUserProjects.length > 0) {
+      const exists = currentUserProjects.some((p) => p.id === selectedProjectId);
+      if (!exists) {
+        setSelectedProjectId(currentUserProjects[0].id);
+      }
+    }
+  }, [currentUser, currentUserProjects, selectedProjectId]);
+
   const switchUserById = (userId: string) => {
     const user = users.find((u) => u.id === userId);
     if (user) {
       setCurrentUser(user);
-      // Auto-navigate appropriately
       if (user.role === 'admin') {
         setActiveTab('admin-overview');
       } else {
@@ -189,9 +242,132 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setNotifications((prev) => [newNotif, ...prev]);
   };
 
+  // Append-only Project Audit Trail (FEATURE 6)
+  const addAuditEvent = (
+    projectId: string,
+    eventName: string,
+    details: string,
+    previousStatus?: string,
+    newStatus?: string,
+    metadata?: Record<string, any>
+  ) => {
+    const newEvent: AuditEvent = {
+      id: `aud-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      projectId,
+      eventName,
+      userId: currentUser.id,
+      userName: currentUser.name,
+      userRole: currentUser.role,
+      timestamp: new Date().toISOString(),
+      previousStatus: previousStatus || 'unchanged',
+      newStatus: newStatus || 'unchanged',
+      details,
+      metadata,
+    };
+
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id === projectId
+          ? {
+              ...p,
+              auditTrail: [newEvent, ...(p.auditTrail || [])],
+            }
+          : p
+      )
+    );
+  };
+
+  // Deterministic Project Health Score Calculation (FEATURE 4)
+  const getProjectHealth = (projectId: string): ProjectHealthMetrics => {
+    const proj = projects.find((p) => p.id === projectId) || projects[0];
+    if (!proj) {
+      return {
+        status: 'Healthy',
+        score: 100,
+        scopeStabilityPct: 100,
+        pendingApprovalsCount: 0,
+        milestoneCompletionPct: 100,
+        daysRemaining: 15,
+        outstandingRequestsCount: 0,
+        reasons: ['Baseline project configuration active.'],
+      };
+    }
+
+    const reasons: string[] = [];
+    let score = 100;
+
+    // 1. Scope Stability
+    const pendingChanges = changeRequests.filter(
+      (r) => r.projectId === projectId && (r.status === 'submitted' || r.status === 'analyzed')
+    );
+    let scopeStabilityPct = 100;
+    if (proj.status === 'scope_alert' || pendingChanges.length > 0) {
+      score -= 25;
+      scopeStabilityPct = 65;
+      reasons.push(`${pendingChanges.length || 1} unbilled client scope expansion(s) detected.`);
+    } else {
+      reasons.push('Scope is locked and stable under current agreement.');
+    }
+
+    // 2. Pending Approvals
+    const pendingProposals = changeRequests.filter(
+      (r) => r.projectId === projectId && r.status === 'proposal_sent'
+    );
+    const pendingApprovalsCount = pendingProposals.length;
+    if (pendingApprovalsCount > 0) {
+      score -= 10;
+      reasons.push('Revised proposal sent; awaiting client signature for Version 2.0.');
+    }
+
+    // 3. Milestone Completion Rate
+    const totalMilestones = proj.milestones.length || 1;
+    const releasedMilestones = proj.milestones.filter((m) => m.status === 'released').length;
+    const milestoneCompletionPct = Math.round((releasedMilestones / totalMilestones) * 100);
+
+    if (milestoneCompletionPct === 100) {
+      reasons.push('All scheduled milestone phases released.');
+    } else {
+      reasons.push(`${milestoneCompletionPct}% milestones released (${releasedMilestones}/${totalMilestones} phases).`);
+    }
+
+    // 4. Deadline Status
+    const deadlineDate = new Date(proj.deadline).getTime();
+    const now = Date.now();
+    const daysRemaining = Math.max(0, Math.ceil((deadlineDate - now) / (1000 * 60 * 60 * 24)));
+
+    if (daysRemaining < 3 && milestoneCompletionPct < 80) {
+      score -= 20;
+      reasons.push(`Deadline imminent (${daysRemaining} days remaining) with pending deliverables.`);
+    } else {
+      reasons.push(`${daysRemaining} business days remaining until target delivery.`);
+    }
+
+    // Classify Health Status
+    let status: 'Healthy' | 'Needs Attention' | 'At Risk' = 'Healthy';
+    if (score < 65) {
+      status = 'At Risk';
+    } else if (score < 85) {
+      status = 'Needs Attention';
+    }
+
+    return {
+      status,
+      score: Math.max(20, Math.min(100, score)),
+      scopeStabilityPct,
+      pendingApprovalsCount,
+      milestoneCompletionPct,
+      daysRemaining,
+      outstandingRequestsCount: pendingChanges.length,
+      reasons,
+    };
+  };
+
   // Create Project
   const createProject = (data: Partial<Project>): Project => {
     const id = `proj-${Date.now()}`;
+    const budgetVal = data.budget || 200;
+    const timelineVal = data.timelineDays || 15;
+
     const newProj: Project = {
       id,
       title: data.title || 'New Web Project',
@@ -199,10 +375,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       clientId: data.clientId || 'client-a',
       description: data.description || 'Full-stack responsive web project.',
       deliverables: data.deliverables || ['Website with 5 pages', 'Contact form', 'Responsive design'],
-      budget: data.budget || 200,
-      timelineDays: data.timelineDays || 15,
+      budget: budgetVal,
+      timelineDays: timelineVal,
       startDate: new Date().toISOString().split('T')[0],
-      deadline: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
+      deadline: new Date(Date.now() + timelineVal * 86400000).toISOString().split('T')[0],
       status: 'active',
       currentVersion: 1,
       milestones: [
@@ -211,7 +387,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           projectId: id,
           title: 'Initial Wireframes & Page Architecture',
           description: 'Structure, wireframe specifications, and design signoff.',
-          amount: Math.round((data.budget || 200) * 0.4),
+          amount: Math.round(budgetVal * 0.4),
           dueDate: new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0],
           status: 'pending',
           simulatedTxId: `TX-SIM-${Math.floor(100000 + Math.random() * 900000)}-TB`,
@@ -221,10 +397,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           projectId: id,
           title: 'Complete Coding, Responsive Testing & Launch',
           description: 'Full deliverable implementation and deployment.',
-          amount: Math.round((data.budget || 200) * 0.6),
-          dueDate: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
+          amount: Math.round(budgetVal * 0.6),
+          dueDate: new Date(Date.now() + timelineVal * 86400000).toISOString().split('T')[0],
           status: 'pending',
           simulatedTxId: `TX-SIM-${Math.floor(100000 + Math.random() * 900000)}-TB`,
+        },
+      ],
+      auditTrail: [
+        {
+          id: `aud-${Date.now()}-1`,
+          projectId: id,
+          eventName: 'Project Workspace Initialized',
+          userId: currentUser.id,
+          userName: currentUser.name,
+          userRole: currentUser.role,
+          timestamp: new Date().toISOString(),
+          previousStatus: 'None',
+          newStatus: 'active',
+          details: `Created project with $${budgetVal} budget and ${timelineVal}-day timeline.`,
         },
       ],
     };
@@ -236,7 +426,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       recipientId: newProj.clientId,
       type: 'project',
       title: `New Project Created: ${newProj.title}`,
-      message: `${currentUser.name} has created a new project workspace.`,
+      message: `${currentUser.name} created a new project workspace.`,
       linkTab: 'projects',
       linkProjectId: newProj.id,
     });
@@ -294,10 +484,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'draft',
       createdAt: new Date().toISOString(),
       revisionLimit: 2,
-      notes: data.notes || 'Created via TrustBridge AI Agreement Drafter',
+      notes: data.notes || 'Created via Dealora AI Agreement Drafter',
+      signers: {
+        freelancerName: freelancer.name,
+        clientName: client?.name || 'Client',
+      },
     };
 
     setAgreements((prev) => [newAgr, ...prev]);
+
+    if (proj) {
+      addAuditEvent(
+        proj.id,
+        `Agreement v${newAgr.version}.0 Generated`,
+        `AI generated agreement drafted with $${newAgr.budget} budget and ScopeGuard clause.`,
+        'None',
+        'draft'
+      );
+    }
+
     return newAgr;
   };
 
@@ -311,11 +516,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const proj = projects.find((p) => p.id === agr.projectId);
     if (proj) {
+      addAuditEvent(
+        proj.id,
+        `Agreement v${agr.version}.0 Sent for Review`,
+        `Submitted contract to ${proj.clientId} for client signoff.`,
+        'draft',
+        'sent_to_client'
+      );
+
       addNotification({
         recipientId: proj.clientId,
         type: 'agreement',
-        title: `New Agreement v${agr.version}.0 Sent for Review`,
-        message: `${currentUser.name} has submitted the initial project agreement ($${agr.budget}, ${agr.timelineDays} days).`,
+        title: `New Agreement v${agr.version}.0 Awaiting Approval`,
+        message: `${currentUser.name} submitted the initial project agreement ($${agr.budget}, ${agr.timelineDays} days).`,
         linkTab: 'agreements',
         linkProjectId: proj.id,
       });
@@ -341,11 +554,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Mark project status as scope_alert
     if (proj) {
       updateProject(projectId, { status: 'scope_alert' });
+
+      addAuditEvent(
+        projectId,
+        'Additional Requirements Submitted',
+        `Client requested: "${requestedText.substring(0, 100)}..."`,
+        'active',
+        'scope_alert'
+      );
+
       addNotification({
         recipientId: proj.freelancerId,
         type: 'scope_request',
-        title: '⚠️ Scope Alert: New Requirements Submitted',
-        message: `${currentUser.name} requested changes: "${requestedText.substring(0, 60)}..." Run ScopeGuard AI to assess impact.`,
+        title: '⚠️ Scope Alert: New Client Requirements Submitted',
+        message: `${currentUser.name} requested modifications: "${requestedText.substring(0, 70)}..." Run ScopeGuard AI to assess impact.`,
         linkTab: 'scopeguard',
         linkProjectId: projectId,
         linkRequestId: newReq.id,
@@ -355,7 +577,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newReq;
   };
 
-  // Run ScopeGuard AI Analysis
+  // Run ScopeGuard AI Analysis (FEATURE 1, 2, 3)
   const runScopeGuardAnalysis = async (
     projectId: string,
     originalScope: string,
@@ -385,6 +607,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...result.data,
       source: result.source,
       isSampleFallback: result.isSampleFallback,
+      items: (result.data.items || []).map((it: ScopeItemAnalysis, idx: number) => ({
+        ...it,
+        id: `scope-item-${idx}`,
+        freelancerStatus: it.freelancerStatus || 'pending',
+        freelancerNotes: it.freelancerNotes || '',
+      })),
     };
 
     // Store in latest change request if present
@@ -406,7 +634,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return prev;
     });
 
+    if (proj) {
+      addAuditEvent(
+        projectId,
+        'ScopeGuard AI Analysis Executed',
+        `Analyzed ${analysisData.items.length} items (${analysisData.riskLevel} risk). Projected additional cost: +$${analysisData.totalAdditionalCost}.`,
+        'scope_alert',
+        'analyzed'
+      );
+
+      addNotification({
+        recipientId: currentUser.id,
+        type: 'analysis',
+        title: 'ScopeGuard AI Analysis Completed',
+        message: `Detected ${analysisData.items.length} scope differences. Review AI evidence and effort breakdown.`,
+        linkTab: 'scopeguard',
+        linkProjectId: projectId,
+      });
+    }
+
     return analysisData;
+  };
+
+  // Freelancer verifies or edits an AI finding (FEATURE 2)
+  const updateScopeItemFinding = (
+    requestId: string,
+    itemIndex: number,
+    updates: Partial<ScopeItemAnalysis>
+  ) => {
+    setChangeRequests((prev) =>
+      prev.map((r) => {
+        if (r.id !== requestId || !r.analysis) return r;
+        const updatedItems = [...r.analysis.items];
+        if (updatedItems[itemIndex]) {
+          updatedItems[itemIndex] = {
+            ...updatedItems[itemIndex],
+            ...updates,
+          };
+        }
+        return {
+          ...r,
+          analysis: {
+            ...r.analysis,
+            items: updatedItems,
+          },
+        };
+      })
+    );
   };
 
   // Send Revised Proposal to Client
@@ -419,7 +693,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ) => {
     let targetReq: ScopeChangeRequest | undefined = changeRequests.find((r) => r.id === requestId);
 
-    // If no existing request, create one on the fly for current project
     if (!targetReq) {
       const proj = projects.find((p) => p.id === selectedProjectId);
       targetReq = {
@@ -458,19 +731,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const proj = projects.find((p) => p.id === targetReq?.projectId);
     if (proj) {
+      addAuditEvent(
+        proj.id,
+        'Revised Scope Proposal Sent',
+        `Transmitted proposal to client with +$${cost} and +${days} days. Notes: "${notes.substring(0, 60)}..."`,
+        'analyzed',
+        'proposal_sent'
+      );
+
       addNotification({
         recipientId: proj.clientId,
         type: 'proposal',
-        title: `Revised Proposal Sent: +$${cost} | +${days} Days`,
-        message: `${currentUser.name} has prepared a ScopeGuard-backed proposal for your new requirements. Please review & sign Version 2.0.`,
-        linkTab: 'agreements',
+        title: `Revised Proposal Received: +$${cost} | +${days} Days`,
+        message: `${currentUser.name} submitted a ScopeGuard-backed proposal for your new requirements. Please review & sign Version 2.0.`,
+        linkTab: 'proposals',
         linkProjectId: proj.id,
         linkRequestId: targetReq.id,
       });
     }
   };
 
-  // Client Accepts Proposal -> creates Agreement Version 2!
+  // Client Accepts Proposal -> Creates Version 2.0! (FEATURE 1, 6)
   const acceptRevisedProposal = (requestId: string) => {
     const req = changeRequests.find((r) => r.id === requestId) || changeRequests[0];
     const projectId = req ? req.projectId : selectedProjectId;
@@ -485,7 +766,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const oldDays = proj.timelineDays;
     const newDays = oldDays + addDays;
 
-    // 1. Mark change request as accepted
+    // 1. Mark request accepted
     setChangeRequests((prev) =>
       prev.map((r) =>
         r.id === (req ? req.id : r.id)
@@ -494,19 +775,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       )
     );
 
-    // 2. Mark existing Version 1 agreement as superseded
+    // 2. Mark Version 1 agreement as superseded
     setAgreements((prev) =>
       prev.map((a) =>
         a.projectId === projectId && a.version === 1 ? { ...a, status: 'superseded' } : a
       )
     );
 
-    // 3. Create Version 2 Agreement
+    // 3. Create Version 2.0 Agreement
     const updatedDeliverables = [
       ...proj.deliverables,
-      '3 Additional customized pages (Total 8 responsive pages)',
-      'Admin Dashboard with user & content management',
-      'Secure Payment Gateway Integration with webhook notifications',
+      '3 Additional custom pages (Expanding total footprint to 8 pages)',
+      'Admin Dashboard with user & content management controls',
+      'Secure Payment Gateway Integration with webhook processing',
     ];
 
     const v2Content = `MASTER FREELANCE SERVICES AGREEMENT – VERSION 2.0 (REVISED ADDENDUM)
@@ -537,7 +818,7 @@ REVISED TOTAL PROJECT DURATION: ${newDays} business days
 - Milestone 3: Admin Dashboard & Payment Gateway Integration ($${addCost}, Scheduled Escrow)
 
 4. DISPUTE PREVENTION & AUDIT RECORD
-Both parties have agreed to these terms transparently via TrustBridge ScopeGuard AI.`;
+Both parties have agreed to these terms transparently via Dealora ScopeGuard AI.`;
 
     const v2Agreement: Agreement = {
       id: `agr-${projectId}-v2`,
@@ -553,11 +834,17 @@ Both parties have agreed to these terms transparently via TrustBridge ScopeGuard
       signedAt: new Date().toISOString(),
       revisionLimit: 3,
       notes: `Upgraded from v1.0. Scope expanded with +$${addCost} and +${addDays} days.`,
+      signers: {
+        freelancerName: 'Alex Rivera',
+        freelancerSignedAt: new Date().toISOString(),
+        clientName: 'Marcus Vance',
+        clientSignedAt: new Date().toISOString(),
+      },
     };
 
     setAgreements((prev) => [v2Agreement, ...prev]);
 
-    // 4. Update Project with Version 2, updated budget, and add new milestone
+    // 4. Update Project with Version 2, updated budget, and Milestone 3
     const newMilestone: ProjectMilestone = {
       id: `ms-${projectId}-3`,
       projectId,
@@ -585,19 +872,33 @@ Both parties have agreed to these terms transparently via TrustBridge ScopeGuard
       )
     );
 
-    // 5. Fire celebratory confetti
+    // 5. Append Audit Trail Event
+    addAuditEvent(
+      projectId,
+      'Agreement Version 2.0 Accepted & Activated',
+      `Client approved scope addendum. Revised budget: $${newBudget} (+$${addCost}), Timeline: ${newDays} days (+${addDays}d). Milestone 3 ($${addCost}) scheduled in escrow.`,
+      'proposal_sent',
+      'active',
+      {
+        oldBudget,
+        newBudget,
+        oldDays,
+        newDays,
+        agreementVersion: 2,
+      }
+    );
+
+    // 6. Confetti
     try {
       confetti({
-        particleCount: 100,
-        spread: 70,
+        particleCount: 120,
+        spread: 75,
         origin: { y: 0.6 },
         colors: ['#2563eb', '#38bdf8', '#10b981', '#6366f1'],
       });
-    } catch {
-      // safe fallback
-    }
+    } catch {}
 
-    // 6. Notify freelancer and client
+    // 7. Notifications
     addNotification({
       recipientId: proj.freelancerId,
       type: 'proposal',
@@ -637,7 +938,15 @@ Both parties have agreed to these terms transparently via TrustBridge ScopeGuard
 
     const proj = projects.find((p) => p.id === req.projectId);
     if (proj) {
-      updateProject(proj.id, { status: 'active' }); // restores active state with Version 1 preserved
+      updateProject(proj.id, { status: 'active' });
+
+      addAuditEvent(
+        proj.id,
+        'Revised Proposal Declined – Version 1.0 Preserved',
+        `Client opted out of scope additions. Reason: "${reason || 'Budget constraints'}". Original v1.0 terms ($${proj.budget}) preserved.`,
+        'proposal_sent',
+        'active'
+      );
 
       addNotification({
         recipientId: proj.freelancerId,
@@ -698,6 +1007,14 @@ Both parties have agreed to these terms transparently via TrustBridge ScopeGuard
         });
       } catch {}
 
+      addAuditEvent(
+        projectId,
+        `Milestone Payment Released ($${targetMs?.amount || 0})`,
+        `Client verified deliverable for "${targetMs?.title}". Simulated TX ${targetMs?.simulatedTxId} cleared.`,
+        'escrow_funded',
+        'released'
+      );
+
       addNotification({
         recipientId: targetProj?.freelancerId || 'freelancer-a',
         type: 'milestone',
@@ -706,6 +1023,14 @@ Both parties have agreed to these terms transparently via TrustBridge ScopeGuard
         linkTab: 'milestones',
         linkProjectId: projectId,
       });
+    } else {
+      addAuditEvent(
+        projectId,
+        `Milestone Status Updated to ${status}`,
+        `Milestone "${targetMs?.title}" updated.`,
+        targetMs?.status,
+        status
+      );
     }
   };
 
@@ -723,6 +1048,12 @@ Both parties have agreed to these terms transparently via TrustBridge ScopeGuard
     setProjects((prev) =>
       prev.map((p) => (p.id === projectId ? { ...p, milestones: [...p.milestones, newMs] } : p))
     );
+
+    addAuditEvent(
+      projectId,
+      'New Milestone Added',
+      `Added milestone phase "${newMs.title}" ($${newMs.amount}).`
+    );
   };
 
   const markNotificationRead = (id: string) => {
@@ -733,6 +1064,13 @@ Both parties have agreed to these terms transparently via TrustBridge ScopeGuard
 
   const clearAllNotifications = () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
+
+  // Open PDF Export Dialog
+  const openAgreementExport = (agreementId?: string) => {
+    const targetId = agreementId || agreements.find((a) => a.projectId === selectedProjectId)?.id || null;
+    setExportTargetAgreementId(targetId);
+    setIsExportModalOpen(true);
   };
 
   // Reset Demo Data
@@ -754,33 +1092,34 @@ Both parties have agreed to these terms transparently via TrustBridge ScopeGuard
     setSelectedProjectId('proj-1');
   };
 
+  // Launch Dedicated Interactive Judge Demo Mode (FEATURE 8)
+  const launchInteractiveJudgeDemo = () => {
+    setIsJudgeModalOpen(true);
+  };
+
   // 19-Step Demo Walkthrough Automator
   const executeWalkthroughAction = async (step: number) => {
     setWalkthroughStep(step);
     switch (step) {
       case 0:
       case 1:
-        // Login as Freelancer A
         switchUserById('freelancer-a');
         setActiveTab('dashboard');
         break;
       case 2:
       case 3:
       case 4:
-        // Create / view website project ($200, 15 days)
         switchUserById('freelancer-a');
         setSelectedProjectId('proj-1');
         setActiveTab('projects');
         break;
       case 5:
-        // Generate and view original agreement
         switchUserById('freelancer-a');
         setSelectedProjectId('proj-1');
         setActiveTab('agreements');
         break;
       case 6:
       case 7:
-        // Switch to Client A and submit new requirements
         switchUserById('client-a');
         setSelectedProjectId('proj-1');
         setActiveTab('submit-scope');
@@ -788,7 +1127,6 @@ Both parties have agreed to these terms transparently via TrustBridge ScopeGuard
       case 8:
       case 9:
       case 10:
-        // Switch back to Freelancer A & Open ScopeGuard AI
         switchUserById('freelancer-a');
         setSelectedProjectId('proj-1');
         setActiveTab('scopeguard');
@@ -797,26 +1135,22 @@ Both parties have agreed to these terms transparently via TrustBridge ScopeGuard
       case 12:
       case 13:
       case 14:
-        // Show Gemini analysis, review cost, send proposal
         switchUserById('freelancer-a');
         setActiveTab('scopeguard');
         break;
       case 15:
-        // Switch to Client A to review proposal
         switchUserById('client-a');
         setSelectedProjectId('proj-1');
         setActiveTab('proposals');
         break;
       case 16:
       case 17:
-        // Client accepts proposal -> creates Version 2!
         switchUserById('client-a');
         acceptRevisedProposal('req-1');
         setActiveTab('version-history');
         break;
       case 18:
       case 19:
-        // View Version 1 vs Version 2 side by side
         setActiveTab('version-history');
         break;
       default:
@@ -832,6 +1166,7 @@ Both parties have agreed to these terms transparently via TrustBridge ScopeGuard
         switchUserById,
         users,
         projects,
+        currentUserProjects,
         agreements,
         changeRequests,
         notifications,
@@ -841,10 +1176,13 @@ Both parties have agreed to these terms transparently via TrustBridge ScopeGuard
         setSelectedProjectId,
         createProject,
         updateProject,
+        getProjectHealth,
+        addAuditEvent,
         createAgreementDraft,
         sendAgreementToClient,
         submitChangeRequestByClient,
         runScopeGuardAnalysis,
+        updateScopeItemFinding,
         sendRevisedProposal,
         acceptRevisedProposal,
         rejectRevisedProposal,
@@ -852,12 +1190,19 @@ Both parties have agreed to these terms transparently via TrustBridge ScopeGuard
         addProjectMilestone,
         markNotificationRead,
         clearAllNotifications,
+        isJudgeModalOpen,
+        setIsJudgeModalOpen,
+        isExportModalOpen,
+        setIsExportModalOpen,
+        exportTargetAgreementId,
+        openAgreementExport,
         resetDemoData,
         walkthroughStep,
         setWalkthroughStep,
         isWalkthroughOpen,
         setIsWalkthroughOpen,
         executeWalkthroughAction,
+        launchInteractiveJudgeDemo,
       }}
     >
       {children}

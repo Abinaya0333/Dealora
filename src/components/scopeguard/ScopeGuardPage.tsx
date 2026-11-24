@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { ScopeGuardAnalysis, ScopeChangeType } from '../../types';
+import { SmartScopeDiffHighlighter } from './SmartScopeDiffHighlighter';
 
 export const ScopeGuardPage: React.FC = () => {
   const {
@@ -112,8 +113,8 @@ export const ScopeGuardPage: React.FC = () => {
         return 'bg-amber-500/10 text-amber-600 border-amber-500/20';
       case 'removed':
         return 'bg-rose-500/10 text-rose-600 border-rose-500/20';
-      case 'clarified':
-        return 'bg-blue-500/10 text-blue-600 border-blue-500/20';
+      case 'needs_clarification':
+        return 'bg-purple-500/10 text-purple-600 border-purple-500/20';
       default:
         return 'bg-slate-500/10 text-slate-600 border-slate-500/20';
     }
@@ -459,55 +460,55 @@ export const ScopeGuardPage: React.FC = () => {
               <p className="text-slate-300">{analysisResult.summary}</p>
             </div>
 
-            {/* Requirement Delta Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 text-slate-500 uppercase font-bold tracking-wider text-[10px]">
-                    <th className="py-3 px-3">Type</th>
-                    <th className="py-3 px-3">Original Requirement</th>
-                    <th className="py-3 px-3">New Requirement</th>
-                    <th className="py-3 px-3">Impact Explanation</th>
-                    <th className="py-3 px-3 text-right">Est. Cost</th>
-                    <th className="py-3 px-3 text-right">Est. Days</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {analysisResult.items.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-3 px-3">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase border ${getChangeBadge(
-                            item.changeType
-                          )}`}
-                        >
-                          {item.changeType}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-slate-500 font-medium max-w-[160px] truncate">
-                        {item.originalRequirement}
-                      </td>
-                      <td className="py-3 px-3 text-slate-900 font-bold max-w-[200px]">
-                        {item.newRequirement}
-                      </td>
-                      <td className="py-3 px-3 text-slate-600 max-w-[280px] leading-relaxed">
-                        {item.explanation}
-                      </td>
-                      <td className="py-3 px-3 text-right font-extrabold text-blue-600">
-                        +${item.estimatedCost}
-                      </td>
-                      <td className="py-3 px-3 text-right font-bold text-slate-700">
-                        +{item.estimatedDays}d
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            {/* Smart Scope Difference Highlighter (FEATURES 1, 2, 3) */}
+            <div className="pt-2">
+              <SmartScopeDiffHighlighter
+                analysis={analysisResult}
+                requestId={
+                  changeRequests.find((r) => r.projectId === currentProject.id)?.id || 'req-1'
+                }
+                onItemUpdated={(idx, updated) => {
+                  if (analysisResult) {
+                    const newItems = [...analysisResult.items];
+                    newItems[idx] = updated;
+                    const newTotalCost = newItems.reduce((s, it) => s + it.estimatedCost, 0);
+                    const newTotalDays = newItems.reduce((s, it) => s + it.estimatedDays, 0);
+                    setAnalysisResult({
+                      ...analysisResult,
+                      items: newItems,
+                      totalAdditionalCost: newTotalCost,
+                      totalAdditionalDays: newTotalDays,
+                    });
+                    setCustomCost(newTotalCost);
+                    setCustomDays(newTotalDays);
+                  }
+                }}
+              />
             </div>
+
+            {/* AI Assumptions List (FEATURE 3) */}
+            {analysisResult.assumptions && analysisResult.assumptions.length > 0 && (
+              <div className="mt-6 pt-4 border-t border-slate-100">
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2 flex items-center space-x-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Gemini Scoping Assumptions:</span>
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  {analysisResult.assumptions.map((assump, i) => (
+                    <div
+                      key={i}
+                      className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-700 leading-normal"
+                    >
+                      • {assump}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Contractual Recommendations */}
             {analysisResult.recommendations && analysisResult.recommendations.length > 0 && (
-              <div className="mt-6 pt-4 border-t border-slate-100">
+              <div className="mt-4 pt-3 border-t border-slate-100">
                 <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2 flex items-center space-x-1.5">
                   <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
                   <span>ScopeGuard Contract Recommendations:</span>

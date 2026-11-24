@@ -65,6 +65,7 @@ export const Sidebar: React.FC = () => {
       badgeColor: 'bg-emerald-500/20 text-emerald-300 font-bold',
     },
     { id: 'version-history', label: 'Version History', icon: History },
+    { id: 'audit-trail', label: 'Audit Trail', icon: FileSignature },
     {
       id: 'notifications',
       label: 'Notifications',
@@ -104,6 +105,7 @@ export const Sidebar: React.FC = () => {
       badgeColor: 'bg-emerald-500/20 text-emerald-300 font-bold',
     },
     { id: 'version-history', label: 'Agreement History', icon: History },
+    { id: 'audit-trail', label: 'Audit Trail', icon: FileSignature },
     {
       id: 'notifications',
       label: 'Notifications',
